@@ -5,8 +5,8 @@ go 1.23.0
 toolchain go1.23.3
 
 require (
-	github.com/boostgo/convert v1.0.0
-	github.com/boostgo/errorx v1.0.0
+	github.com/boostgo/convert v1.0.1
+	github.com/boostgo/errorx v1.0.1
 	github.com/golang-migrate/migrate/v4 v4.18.2
 	github.com/jackc/pgx/v5 v5.5.4
 	github.com/jmoiron/sqlx v1.4.0
