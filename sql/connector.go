@@ -2,6 +2,7 @@ package sql
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -16,6 +17,8 @@ type Connector struct {
 	database         string
 	schema           string
 	binaryParameters bool
+	writeTimeout     int
+	readTimeout      int
 
 	timeout time.Duration
 
@@ -84,6 +87,22 @@ func (connector *Connector) BinaryParameters(binaryParameters bool) *Connector {
 	return connector
 }
 
+// ReadTimeout set readTimeout parameter.
+//
+// For clickhouse
+func (connector *Connector) ReadTimeout(readTimeout int) *Connector {
+	connector.readTimeout = readTimeout
+	return connector
+}
+
+// WriteTimeout set writeTimeout parameter.
+//
+// For clickhouse
+func (connector *Connector) WriteTimeout(writeTimeout int) *Connector {
+	connector.writeTimeout = writeTimeout
+	return connector
+}
+
 // Timeout set timeout for connect & ping (via [context.Context])
 func (connector *Connector) Timeout(timeout time.Duration) *Connector {
 	connector.timeout = timeout
@@ -136,6 +155,40 @@ func (connector *Connector) Build() string {
 	)
 }
 
+func (connector *Connector) BuildClickhouse() string {
+	scheme := "https"
+	if os.Getenv("LOCAL") == "true" {
+		scheme = "http"
+	}
+
+	args := make([]any, 0)
+	args = append(
+		args,
+		scheme, connector.username, connector.password,
+		connector.host, connector.port,
+		connector.database,
+	)
+
+	template := "%s://%s:%s@%s:%d/%s?"
+
+	if connector.readTimeout > 0 {
+		template += "read_timeout=%ds"
+		args = append(args, connector.readTimeout)
+	}
+
+	if connector.writeTimeout > 0 {
+		prefix := ""
+		if connector.readTimeout > 0 {
+			prefix = "&"
+		}
+
+		template += prefix + "write_timeout=%ds"
+		args = append(args, connector.writeTimeout)
+	}
+
+	return fmt.Sprintf(template, args...)
+}
+
 // String calls Build method
 func (connector *Connector) String() string {
 	return connector.Build()
@@ -152,9 +205,14 @@ func (connector *Connector) Connect(
 		MaxTimeOption(connector.maxConnLifetime, connector.maxIdleTime),
 	)
 
+	connectionString := connector.Build()
+	if driverName == ChDriver {
+		connectionString = connector.BuildClickhouse()
+	}
+
 	return Connect(
 		driverName,
-		connector.Build(),
+		connectionString,
 		connector.timeout,
 		options...,
 	)
@@ -165,9 +223,14 @@ func (connector *Connector) MustConnect(
 	driverName string,
 	options ...func(connection *sqlx.DB),
 ) *sqlx.DB {
+	connectionString := connector.Build()
+	if driverName == ChDriver {
+		connectionString = connector.BuildClickhouse()
+	}
+
 	return MustConnect(
 		driverName,
-		connector.Build(),
+		connectionString,
 		connector.timeout,
 		options...,
 	)
@@ -194,6 +257,10 @@ func ConnectionString(
 // MaxConnectionsOption sets max open & idle connections
 func MaxConnectionsOption(open, idle int) func(conn *sqlx.DB) {
 	return func(conn *sqlx.DB) {
+		if open == 0 || idle == 0 {
+			return
+		}
+
 		conn.SetMaxOpenConns(open)
 		conn.SetMaxIdleConns(idle)
 	}
@@ -202,6 +269,10 @@ func MaxConnectionsOption(open, idle int) func(conn *sqlx.DB) {
 // MaxTimeOption sets connection max lifetime & max idle time settings
 func MaxTimeOption(lifetime, idle time.Duration) func(conn *sqlx.DB) {
 	return func(conn *sqlx.DB) {
+		if lifetime == 0 || idle == 0 {
+			return
+		}
+
 		conn.SetConnMaxLifetime(lifetime)
 		conn.SetConnMaxIdleTime(idle)
 	}

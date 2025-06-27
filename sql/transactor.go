@@ -3,7 +3,7 @@ package sql
 import (
 	"context"
 	"database/sql"
-	
+
 	"github.com/boostgo/storage"
 	"github.com/jmoiron/sqlx"
 )
@@ -34,7 +34,7 @@ func (st *sqlTransactor) Begin(ctx context.Context) (storage.Transaction, error)
 		ReadOnly:  false,
 	})
 	if err != nil {
-		return nil, err
+		return nil, ErrTransactorBegin.SetError(err)
 	}
 
 	return newTransactorTx(ctx, tx), nil
@@ -46,7 +46,7 @@ func (st *sqlTransactor) BeginCtx(ctx context.Context) (context.Context, error) 
 		ReadOnly:  false,
 	})
 	if err != nil {
-		return nil, err
+		return nil, ErrTransactorBegin.SetError(err)
 	}
 
 	return SetTx(ctx, tx), nil
@@ -58,7 +58,11 @@ func (st *sqlTransactor) CommitCtx(ctx context.Context) error {
 		return nil
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return ErrTransactorCommit.SetError(err)
+	}
+
+	return nil
 }
 
 func (st *sqlTransactor) RollbackCtx(ctx context.Context) error {
@@ -67,7 +71,11 @@ func (st *sqlTransactor) RollbackCtx(ctx context.Context) error {
 		return nil
 	}
 
-	return tx.Rollback()
+	if err := tx.Rollback(); err != nil {
+		return ErrTransactorRollback.SetError(err)
+	}
+
+	return nil
 }
 
 func (st *sqlTransactor) IsTx(ctx context.Context) bool {
@@ -77,6 +85,15 @@ func (st *sqlTransactor) IsTx(ctx context.Context) bool {
 
 	_, ok := GetTx(ctx)
 	return ok
+}
+
+func (st *sqlTransactor) TryCommit(ctx context.Context, err *error) {
+	if err != nil {
+		_ = st.RollbackCtx(ctx)
+		return
+	}
+
+	_ = st.CommitCtx(ctx)
 }
 
 type sqlTransaction struct {

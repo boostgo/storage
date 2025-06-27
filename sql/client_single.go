@@ -3,9 +3,10 @@ package sql
 import (
 	"context"
 	"database/sql"
-	"errors"
 
-	"github.com/boostgo/errorx"
+	"github.com/boostgo/contextx"
+	"github.com/boostgo/convert"
+	"github.com/boostgo/log"
 	"github.com/boostgo/storage"
 	"github.com/jmoiron/sqlx"
 )
@@ -13,7 +14,6 @@ import (
 type clientSingle struct {
 	conn      *sqlx.DB
 	enableLog bool
-	logger    Logger
 }
 
 // Client creates DB implementation by single client
@@ -29,17 +29,14 @@ func Client(conn *sqlx.DB, enableLog ...bool) DB {
 	}
 }
 
-func (c *clientSingle) SetLogger(logger Logger) DB {
-	c.logger = logger
-	return c
-}
-
 func (c *clientSingle) Connection() *sqlx.DB {
 	return c.conn
 }
 
-func (c *clientSingle) ExecContext(ctx context.Context, query string, args ...interface{}) (result sql.Result, err error) {
-	defer errorx.Wrap(errType, &err, "ExecContext")
+func (c *clientSingle) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+	if err := contextx.Validate(ctx); err != nil {
+		return nil, err
+	}
 
 	c.printLog(ctx, "ExecContext", query, args...)
 
@@ -51,8 +48,10 @@ func (c *clientSingle) ExecContext(ctx context.Context, query string, args ...in
 	return c.conn.ExecContext(ctx, query, args...)
 }
 
-func (c *clientSingle) QueryContext(ctx context.Context, query string, args ...interface{}) (rows *sql.Rows, err error) {
-	defer errorx.Wrap(errType, &err, "QueryContext")
+func (c *clientSingle) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+	if err := contextx.Validate(ctx); err != nil {
+		return nil, err
+	}
 
 	c.printLog(ctx, "QueryContext", query, args...)
 
@@ -64,8 +63,10 @@ func (c *clientSingle) QueryContext(ctx context.Context, query string, args ...i
 	return c.conn.QueryContext(ctx, query, args...)
 }
 
-func (c *clientSingle) QueryxContext(ctx context.Context, query string, args ...interface{}) (rows *sqlx.Rows, err error) {
-	defer errorx.Wrap(errType, &err, "QueryxContext")
+func (c *clientSingle) QueryxContext(ctx context.Context, query string, args ...interface{}) (*sqlx.Rows, error) {
+	if err := contextx.Validate(ctx); err != nil {
+		return nil, err
+	}
 
 	c.printLog(ctx, "QueryxContext", query, args...)
 
@@ -88,8 +89,10 @@ func (c *clientSingle) QueryRowxContext(ctx context.Context, query string, args 
 	return c.conn.QueryRowxContext(ctx, query, args...)
 }
 
-func (c *clientSingle) PrepareContext(ctx context.Context, query string) (statement *sql.Stmt, err error) {
-	defer errorx.Wrap(errType, &err, "PrepareContext")
+func (c *clientSingle) PrepareContext(ctx context.Context, query string) (*sql.Stmt, error) {
+	if err := contextx.Validate(ctx); err != nil {
+		return nil, err
+	}
 
 	c.printLog(ctx, "PrepareContext", query)
 
@@ -101,8 +104,10 @@ func (c *clientSingle) PrepareContext(ctx context.Context, query string) (statem
 	return c.conn.PrepareContext(ctx, query)
 }
 
-func (c *clientSingle) NamedExecContext(ctx context.Context, query string, arg interface{}) (result sql.Result, err error) {
-	defer errorx.Wrap(errType, &err, "NamedExecContext")
+func (c *clientSingle) NamedExecContext(ctx context.Context, query string, arg interface{}) (sql.Result, error) {
+	if err := contextx.Validate(ctx); err != nil {
+		return nil, err
+	}
 
 	c.printLog(ctx, "NamedExecContext", query, arg)
 
@@ -114,8 +119,10 @@ func (c *clientSingle) NamedExecContext(ctx context.Context, query string, arg i
 	return c.conn.NamedExecContext(ctx, query, arg)
 }
 
-func (c *clientSingle) SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) (err error) {
-	defer errorx.Wrap(errType, &err, "SelectContext")
+func (c *clientSingle) SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
+	if err := contextx.Validate(ctx); err != nil {
+		return err
+	}
 
 	c.printLog(ctx, "SelectContext", query, args...)
 
@@ -127,8 +134,10 @@ func (c *clientSingle) SelectContext(ctx context.Context, dest interface{}, quer
 	return c.conn.SelectContext(ctx, dest, query, args...)
 }
 
-func (c *clientSingle) GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) (err error) {
-	defer errorx.Wrap(errType, &err, "GetContext")
+func (c *clientSingle) GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
+	if err := contextx.Validate(ctx); err != nil {
+		return err
+	}
 
 	c.printLog(ctx, "GetContext", query, args...)
 
@@ -140,8 +149,10 @@ func (c *clientSingle) GetContext(ctx context.Context, dest interface{}, query s
 	return c.conn.GetContext(ctx, dest, query, args...)
 }
 
-func (c *clientSingle) PrepareNamedContext(ctx context.Context, query string) (statement *sqlx.NamedStmt, err error) {
-	defer errorx.Wrap(errType, &err, "PrepareNamedContext")
+func (c *clientSingle) PrepareNamedContext(ctx context.Context, query string) (*sqlx.NamedStmt, error) {
+	if err := contextx.Validate(ctx); err != nil {
+		return nil, err
+	}
 
 	c.printLog(ctx, "PrepareNamedContext", query)
 
@@ -154,28 +165,39 @@ func (c *clientSingle) PrepareNamedContext(ctx context.Context, query string) (s
 }
 
 func (c *clientSingle) EachShard(_ func(conn DB) error) error {
-	return errors.New("method not supported in single client")
+	return ErrMethodNotSuppoertedInSingle
 }
 
 func (c *clientSingle) EachShardAsync(_ func(conn DB) error, _ ...int) error {
-	return errors.New("method not supported in single client")
+	return ErrMethodNotSuppoertedInSingle
 }
 
 func (c *clientSingle) printLog(ctx context.Context, queryType, query string, args ...any) {
-	if !c.enableLog || storage.IsNoLog(ctx) || c.logger == nil {
+	if !c.enableLog || storage.IsNoLog(ctx) {
 		return
 	}
 
-	c.logger.Print(ctx, "single-client", queryType, query, args)
+	convertedArgs := make([]string, 0, len(args))
+	for _, arg := range args {
+		convertedArgs = append(convertedArgs, convert.String(arg))
+	}
+
+	log.
+		Info().
+		Ctx(ctx).
+		Str("queryType", queryType).
+		Str("query", query).
+		Strs("args", convertedArgs).
+		Send()
 }
 
 // Page returns offset & limit by pagination
-func Page(pageSize, page int) (offset int, limit int) {
+func Page(pageSize int64, page int) (offset int, limit int) {
 	if page == 0 {
 		page = 1
 	}
 
-	offset = (page - 1) * pageSize
-	limit = pageSize
+	offset = (page - 1) * int(pageSize)
+	limit = int(pageSize)
 	return offset, limit
 }

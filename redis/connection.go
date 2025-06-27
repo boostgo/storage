@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/boostgo/errorx"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -44,7 +43,7 @@ func Connect(address string, port, db int, password string, opts ...Option) (*re
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
-		return nil, err
+		return nil, ErrPing.SetError(err)
 	}
 
 	return client, nil
@@ -104,31 +103,32 @@ func (conn *shardConnect) Close() error {
 }
 
 // ConnectShards connect all provided connections and create Connections object
-func ConnectShards(connectionStrings []ShardConnectConfig, selector ClientSelector, options ...Option) (*Clients, error) {
+func ConnectShards(
+	connectionStrings []ShardConnectConfig,
+	selector ClientSelector,
+	options ...Option,
+) (*Clients, error) {
 	// validate for connection key unique and for empty
 	// also, validate for empty connection string
 	keys := make(map[string]struct{}, len(connectionStrings))
 	for _, cs := range connectionStrings {
 		if cs.Key == "" {
-			return nil, errorx.New("Client key is empty")
+			return nil, ErrClientKeyEmpty
 		}
 
 		if cs.Address == "" {
-			return nil, errorx.
-				New("Client address is empty").
-				AddContext("key", cs.Key)
+			return nil, ErrClientAddressEmpty.
+				AddParam("key", cs.Key)
 		}
 
 		if cs.Port == 0 {
-			return nil, errorx.
-				New("Client port is zero").
-				AddContext("key", cs.Key)
+			return nil, ErrClientPortZero.
+				AddParam("key", cs.Key)
 		}
 
 		if _, ok := keys[cs.Key]; ok {
-			return nil, errorx.
-				New("Connection keys cannot duplicate").
-				AddContext("key", cs.Key)
+			return nil, ErrClientConnectionKeyDuplicate.
+				AddParam("key", cs.Key)
 		}
 
 		keys[cs.Key] = struct{}{}

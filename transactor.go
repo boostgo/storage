@@ -17,6 +17,7 @@ type Transactor interface {
 	BeginCtx(ctx context.Context) (context.Context, error)
 	CommitCtx(ctx context.Context) error
 	RollbackCtx(ctx context.Context) error
+	TryCommit(ctx context.Context, err *error)
 }
 
 // Transaction interface using by Transactor
@@ -111,6 +112,15 @@ func (t *transactor) RollbackCtx(ctx context.Context) error {
 		})
 	}
 	return wg.Wait()
+}
+
+func (t *transactor) TryCommit(ctx context.Context, err *error) {
+	if err != nil {
+		_ = t.RollbackCtx(ctx)
+		return
+	}
+
+	_ = t.CommitCtx(ctx)
 }
 
 type transaction struct {

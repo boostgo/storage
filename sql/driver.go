@@ -3,10 +3,11 @@ package sql
 import (
 	"database/sql"
 	"database/sql/driver"
+	"slices"
+
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/lib/pq"
 	"github.com/mailru/go-clickhouse"
-	"slices"
 )
 
 const (

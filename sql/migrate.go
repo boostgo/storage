@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/boostgo/errorx"
+	"github.com/boostgo/log"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/jmoiron/sqlx"
@@ -13,31 +13,23 @@ import (
 	_ "github.com/lib/pq"
 )
 
-var (
-	MigrateErrorLog    = func(err error, dbName string) {}
-	MigrateNoChangeLog = func(dbName string) {}
-)
-
 // Migrate runs migration by provided connection & database name.
 //
 // Use by default ./migrations directory in the root of project.
 func Migrate(ctx context.Context, conn *sqlx.DB, databaseName string, migrationsDir ...string) (err error) {
-	const errType = "Storage Migrate"
-	defer errorx.Wrap(errType, &err, "Migrate")
-
 	nativeConn, err := conn.Conn(ctx)
 	if err != nil {
-		return err
+		return ErrMigrateOpenConn.SetError(err)
 	}
 
 	driver, err := postgres.WithConnection(ctx, nativeConn, &postgres.Config{})
 	if err != nil {
-		return err
+		return ErrMigrateGetDriver.SetError(err)
 	}
 
 	_, err = nativeConn.ExecContext(ctx, "SET lock_timeout = '60s';")
 	if err != nil {
-		return err
+		return ErrMigrateLock.SetError(err)
 	}
 
 	const defaultMigrationsDir = "./migrations"
@@ -48,17 +40,21 @@ func Migrate(ctx context.Context, conn *sqlx.DB, databaseName string, migrations
 
 	migrator, err := migrate.NewWithDatabaseInstance("file://"+migrationsDirectoryPath, databaseName, driver)
 	if err != nil {
-		return err
+		return ErrMigrateReadMigrationsDir.SetError(err)
 	}
 	defer migrator.Close()
 
 	if err = migrator.Up(); err != nil {
 		if errors.Is(err, migrate.ErrNoChange) {
-			MigrateNoChangeLog(databaseName)
+			log.
+				Info().
+				Ctx(ctx).
+				Str("database_name", databaseName).
+				Msg("Migrate no change")
 			return nil
 		}
 
-		return err
+		return ErrMigrateUp.SetError(err)
 	}
 
 	return nil
@@ -74,6 +70,15 @@ func MustMigrate(ctx context.Context, conn *sqlx.DB, databaseName string) {
 // BackgroundMigrate calls Migrate function and if error catch print log
 func BackgroundMigrate(ctx context.Context, conn *sqlx.DB, databaseName string) {
 	if err := Migrate(ctx, conn, databaseName); err != nil {
-		MigrateErrorLog(err, databaseName)
+		log.
+			Error().
+			Ctx(ctx).
+			Err(err).
+			Str("database_name", databaseName).
+			Msg("Migration failed")
 	}
+}
+
+func AsyncMigrate(ctx context.Context, conn *sqlx.DB, databaseName string) {
+	go BackgroundMigrate(ctx, conn, databaseName)
 }

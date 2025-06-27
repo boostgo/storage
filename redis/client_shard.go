@@ -7,6 +7,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/boostgo/contextx"
 	"github.com/boostgo/errorx"
 	"github.com/boostgo/storage"
 	"github.com/redis/go-redis/v9"
@@ -33,6 +34,10 @@ func (client *shardClient) Close() error {
 }
 
 func (client *shardClient) Client(ctx context.Context) (redis.UniversalClient, error) {
+	if err := contextx.Validate(ctx); err != nil {
+		return nil, err
+	}
+
 	c, err := client.clients.Get(ctx)
 	if err != nil {
 		return nil, err
@@ -42,6 +47,10 @@ func (client *shardClient) Client(ctx context.Context) (redis.UniversalClient, e
 }
 
 func (client *shardClient) Pipeline(ctx context.Context) (redis.Pipeliner, error) {
+	if err := contextx.Validate(ctx); err != nil {
+		return nil, err
+	}
+
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
 		return nil, err
@@ -51,6 +60,10 @@ func (client *shardClient) Pipeline(ctx context.Context) (redis.Pipeliner, error
 }
 
 func (client *shardClient) TxPipeline(ctx context.Context) (redis.Pipeliner, error) {
+	if err := contextx.Validate(ctx); err != nil {
+		return nil, err
+	}
+
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
 		return nil, err
@@ -59,28 +72,27 @@ func (client *shardClient) TxPipeline(ctx context.Context) (redis.Pipeliner, err
 	return raw.Client().TxPipeline(), nil
 }
 
-func (client *shardClient) Keys(ctx context.Context, pattern string) (keys []string, err error) {
-	defer errorx.Wrap(errType, &err, "Keys")
+func (client *shardClient) Keys(ctx context.Context, pattern string) ([]string, error) {
+	if err := contextx.Validate(ctx); err != nil {
+		return nil, err
+	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.Keys(ctx, pattern).Result()
-	}
-
 	return raw.Client().Keys(ctx, pattern).Result()
 }
 
-func (client *shardClient) Delete(ctx context.Context, keys ...string) (err error) {
+func (client *shardClient) Delete(ctx context.Context, keys ...string) error {
+	if err := contextx.Validate(ctx); err != nil {
+		return err
+	}
+
 	if len(keys) == 0 {
 		return nil
 	}
-
-	defer errorx.Wrap(errType, &err, "Delete")
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
@@ -96,120 +108,80 @@ func (client *shardClient) Delete(ctx context.Context, keys ...string) (err erro
 		return nil
 	}
 
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.Del(ctx, keys...).Err()
-	}
-
 	return raw.Client().Del(ctx, keys...).Err()
 }
 
-func (client *shardClient) Dump(ctx context.Context, key string) (result string, err error) {
-	defer errorx.Wrap(errType, &err, "Dump")
-
-	if err = validateKey(key); err != nil {
-		return result, err
+func (client *shardClient) Dump(ctx context.Context, key string) (string, error) {
+	if err := validate(ctx, key); err != nil {
+		return "", err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
-		return result, err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.Dump(ctx, key).Result()
+		return "", err
 	}
 
 	return raw.Client().Dump(ctx, key).Result()
 }
 
-func (client *shardClient) Rename(ctx context.Context, oldKey, newKey string) (err error) {
-	defer errorx.Wrap(errType, &err, "Rename")
-
-	if err = validateKey(oldKey); err != nil {
-		return errorx.
-			New("Old key is invalid").
-			SetError(err)
+func (client *shardClient) Rename(ctx context.Context, oldKey, newKey string) error {
+	if err := validate(ctx, oldKey); err != nil {
+		return ErrInvalidKey.
+			SetError(err).
+			AddParam("key_type", "old")
 	}
 
-	if err = validateKey(newKey); err != nil {
-		return errorx.
-			New("New key is invalid").
-			SetError(err)
+	if err := validate(ctx, newKey); err != nil {
+		return ErrInvalidKey.
+			SetError(err).
+			AddParam("key_type", "new")
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
 		return err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.Rename(ctx, oldKey, newKey).Err()
 	}
 
 	return raw.Client().Rename(ctx, oldKey, newKey).Err()
 }
 
-func (client *shardClient) Refresh(ctx context.Context, key string, ttl time.Duration) (err error) {
-	defer errorx.Wrap(errType, &err, "Refresh")
-
-	if err = validateKey(key); err != nil {
+func (client *shardClient) Refresh(ctx context.Context, key string, ttl time.Duration) error {
+	if err := validate(ctx, key); err != nil {
 		return err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
 		return err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.Expire(ctx, key, ttl).Err()
 	}
 
 	return raw.Client().Expire(ctx, key, ttl).Err()
 }
 
-func (client *shardClient) RefreshAt(ctx context.Context, key string, at time.Time) (err error) {
-	defer errorx.Wrap(errType, &err, "RefreshAt")
-
-	if err = validateKey(key); err != nil {
+func (client *shardClient) RefreshAt(ctx context.Context, key string, at time.Time) error {
+	if err := validate(ctx, key); err != nil {
 		return err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
 		return err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.ExpireAt(ctx, key, at).Err()
 	}
 
 	return raw.Client().ExpireAt(ctx, key, at).Err()
 }
 
-func (client *shardClient) TTL(ctx context.Context, key string) (ttl time.Duration, err error) {
-	defer errorx.Wrap(errType, &err, "TTL")
-
-	if err = validateKey(key); err != nil {
-		return ttl, err
+func (client *shardClient) TTL(ctx context.Context, key string) (time.Duration, error) {
+	if err := validate(ctx, key); err != nil {
+		return 0, err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
-		return ttl, err
+		return 0, err
 	}
 
-	tx, ok := GetTx(ctx)
-	if ok {
-		ttl, err = tx.TTL(ctx, key).Result()
-	} else {
-		ttl, err = raw.Client().TTL(ctx, key).Result()
-	}
+	ttl, err := raw.Client().TTL(ctx, key).Result()
 	if err != nil {
 		return ttl, err
 	}
@@ -222,10 +194,8 @@ func (client *shardClient) TTL(ctx context.Context, key string) (ttl time.Durati
 	return ttl, nil
 }
 
-func (client *shardClient) Set(ctx context.Context, key string, value any, ttl ...time.Duration) (err error) {
-	defer errorx.Wrap(errType, &err, "Set")
-
-	if err = validateKey(key); err != nil {
+func (client *shardClient) Set(ctx context.Context, key string, value any, ttl ...time.Duration) error {
+	if err := validate(ctx, key); err != nil {
 		return err
 	}
 
@@ -239,38 +209,24 @@ func (client *shardClient) Set(ctx context.Context, key string, value any, ttl .
 		return err
 	}
 
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.Set(ctx, key, value, expireAt).Err()
-	}
-
 	return raw.Client().Set(ctx, key, value, expireAt).Err()
 }
 
-func (client *shardClient) Get(ctx context.Context, key string) (result string, err error) {
-	defer errorx.Wrap(errType, &err, "Get")
-
-	if err = validateKey(key); err != nil {
-		return result, err
+func (client *shardClient) Get(ctx context.Context, key string) (string, error) {
+	if err := validate(ctx, key); err != nil {
+		return "", err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
-		return result, err
+		return "", err
 	}
 
-	tx, ok := GetTx(ctx)
-	if ok {
-		result, err = tx.Get(ctx, key).Result()
-	} else {
-		result, err = raw.Client().Get(ctx, key).Result()
-	}
+	result, err := raw.Client().Get(ctx, key).Result()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
-			return result, errorx.
-				New("Redis key not found").
-				SetError(errorx.ErrNotFound).
-				AddContext("key", key)
+			return result, ErrKeyNotFound.
+				AddParam("key", key)
 		}
 
 		return result, err
@@ -279,54 +235,9 @@ func (client *shardClient) Get(ctx context.Context, key string) (result string, 
 	return result, nil
 }
 
-func (client *shardClient) MGet(ctx context.Context, keys []string) (result []any, err error) {
-	defer errorx.Wrap(errType, &err, "MGet")
-
-	validateKeys(keys)
-
-	raw, err := client.clients.Get(ctx)
-	if err != nil {
-		return result, err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		result, err = tx.MGet(ctx, keys...).Result()
-	} else {
-		result, err = raw.Client().MGet(ctx, keys...).Result()
-	}
-	if err != nil {
-		return result, err
-	}
-
-	return result, nil
-}
-
-func (client *shardClient) Exist(ctx context.Context, key string) (result int64, err error) {
-	defer errorx.Wrap(errType, &err, "Exist")
-
-	if err = validateKey(key); err != nil {
-		return result, err
-	}
-
-	raw, err := client.clients.Get(ctx)
-	if err != nil {
-		return result, err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.Exists(ctx, key).Result()
-	}
-
-	return raw.Client().Exists(ctx, key).Result()
-}
-
-func (client *shardClient) GetBytes(ctx context.Context, key string) (result []byte, err error) {
-	defer errorx.Wrap(errType, &err, "Get")
-
-	if err = validateKey(key); err != nil {
-		return result, err
+func (client *shardClient) MGet(ctx context.Context, keys []string) ([]any, error) {
+	if err := validateMultiple(ctx, keys); err != nil {
+		return nil, err
 	}
 
 	raw, err := client.clients.Get(ctx)
@@ -334,50 +245,42 @@ func (client *shardClient) GetBytes(ctx context.Context, key string) (result []b
 		return nil, err
 	}
 
-	tx, ok := GetTx(ctx)
-	if ok {
-		result, err = tx.Get(ctx, key).Bytes()
-	} else {
-		result, err = raw.Client().Get(ctx, key).Bytes()
-	}
+	result, err := raw.Client().MGet(ctx, keys...).Result()
 	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			return result, errorx.
-				New("Redis key not found").
-				SetError(errorx.ErrNotFound).
-				AddContext("key", key)
-		}
-
-		return result, err
+		return nil, err
 	}
 
 	return result, nil
 }
 
-func (client *shardClient) GetInt(ctx context.Context, key string) (result int, err error) {
-	defer errorx.Wrap(errType, &err, "GetInt")
-
-	if err = validateKey(key); err != nil {
-		return result, err
+func (client *shardClient) Exist(ctx context.Context, key string) (int64, error) {
+	if err := validate(ctx, key); err != nil {
+		return 0, err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
-		return result, err
+		return 0, err
 	}
 
-	tx, ok := GetTx(ctx)
-	if ok {
-		result, err = tx.Get(ctx, key).Int()
-	} else {
-		result, err = raw.Client().Get(ctx, key).Int()
+	return raw.Client().Exists(ctx, key).Result()
+}
+
+func (client *shardClient) GetBytes(ctx context.Context, key string) ([]byte, error) {
+	if err := validate(ctx, key); err != nil {
+		return nil, err
 	}
+
+	raw, err := client.clients.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := raw.Client().Get(ctx, key).Bytes()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
-			return result, errorx.
-				New("Redis key not found").
-				SetError(errorx.ErrNotFound).
-				AddContext("key", key)
+			return nil, ErrKeyNotFound.
+				AddParam("key", key)
 		}
 
 		return result, err
@@ -386,10 +289,31 @@ func (client *shardClient) GetInt(ctx context.Context, key string) (result int, 
 	return result, nil
 }
 
-func (client *shardClient) Parse(ctx context.Context, key string, export any) (err error) {
-	defer errorx.Wrap(errType, &err, "Parse")
+func (client *shardClient) GetInt(ctx context.Context, key string) (int, error) {
+	if err := validate(ctx, key); err != nil {
+		return 0, err
+	}
 
-	if err = validateKey(key); err != nil {
+	raw, err := client.clients.Get(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	result, err := raw.Client().Get(ctx, key).Int()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return 0, ErrKeyNotFound.
+				AddParam("key", key)
+		}
+
+		return 0, err
+	}
+
+	return result, nil
+}
+
+func (client *shardClient) Parse(ctx context.Context, key string, export any) error {
+	if err := validate(ctx, key); err != nil {
 		return err
 	}
 
@@ -399,18 +323,11 @@ func (client *shardClient) Parse(ctx context.Context, key string, export any) (e
 	}
 
 	var result []byte
-	tx, ok := GetTx(ctx)
-	if ok {
-		result, err = tx.Get(ctx, key).Bytes()
-	} else {
-		result, err = raw.Client().Get(ctx, key).Bytes()
-	}
+	result, err = raw.Client().Get(ctx, key).Bytes()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
-			return errorx.
-				New("Redis key not found").
-				SetError(errorx.ErrNotFound).
-				AddContext("key", key)
+			return ErrKeyNotFound.
+				AddParam("key", key)
 		}
 
 		return err
@@ -419,10 +336,8 @@ func (client *shardClient) Parse(ctx context.Context, key string, export any) (e
 	return json.Unmarshal(result, &export)
 }
 
-func (client *shardClient) HSet(ctx context.Context, key string, value map[string]any) (err error) {
-	defer errorx.Wrap(errType, &err, "HSet")
-
-	if err = validateKey(key); err != nil {
+func (client *shardClient) HSet(ctx context.Context, key string, value map[string]any) error {
+	if err := validate(ctx, key); err != nil {
 		return err
 	}
 
@@ -431,19 +346,12 @@ func (client *shardClient) HSet(ctx context.Context, key string, value map[strin
 		return err
 	}
 
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.HSet(ctx, key, value).Err()
-	}
-
 	return raw.Client().HSet(ctx, key, value).Err()
 }
 
-func (client *shardClient) HGetAll(ctx context.Context, key string) (result map[string]string, err error) {
-	defer errorx.Wrap(errType, &err, "HGetAll")
-
-	if err = validateKey(key); err != nil {
-		return result, err
+func (client *shardClient) HGetAll(ctx context.Context, key string) (map[string]string, error) {
+	if err := validate(ctx, key); err != nil {
+		return nil, err
 	}
 
 	raw, err := client.clients.Get(ctx)
@@ -451,421 +359,302 @@ func (client *shardClient) HGetAll(ctx context.Context, key string) (result map[
 		return nil, err
 	}
 
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.HGetAll(ctx, key).Result()
-	}
-
 	return raw.Client().HGetAll(ctx, key).Result()
 }
 
-func (client *shardClient) HGet(ctx context.Context, key, field string) (result string, err error) {
-	defer errorx.Wrap(errType, &err, "HGet")
-
-	if err = validateKey(key); err != nil {
-		return result, err
+func (client *shardClient) HGet(ctx context.Context, key, field string) (string, error) {
+	if err := validate(ctx, key); err != nil {
+		return "", err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
-		return result, err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.HGet(ctx, key, field).Result()
+		return "", err
 	}
 
 	return raw.Client().HGet(ctx, key, field).Result()
 }
 
-func (client *shardClient) HGetInt(ctx context.Context, key, field string) (result int, err error) {
-	defer errorx.Wrap(errType, &err, "HGet")
-
-	if err = validateKey(key); err != nil {
-		return result, err
+func (client *shardClient) HGetInt(ctx context.Context, key, field string) (int, error) {
+	if err := validate(ctx, key); err != nil {
+		return 0, err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
-		return result, err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.HGet(ctx, key, field).Int()
+		return 0, err
 	}
 
 	return raw.Client().HGet(ctx, key, field).Int()
 }
 
-func (client *shardClient) HGetBool(ctx context.Context, key, field string) (result bool, err error) {
-	defer errorx.Wrap(errType, &err, "HGet")
-
-	if err = validateKey(key); err != nil {
-		return result, err
+func (client *shardClient) HGetBool(ctx context.Context, key, field string) (bool, error) {
+	if err := validate(ctx, key); err != nil {
+		return false, err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
-		return result, err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.HGet(ctx, key, field).Bool()
+		return false, err
 	}
 
 	return raw.Client().HGet(ctx, key, field).Bool()
 }
 
-func (client *shardClient) HExist(ctx context.Context, key, field string) (exist bool, err error) {
-	defer errorx.Wrap(errType, &err, "HExist")
-
-	if err = validateKey(key); err != nil {
-		return exist, err
+func (client *shardClient) HExist(ctx context.Context, key, field string) (bool, error) {
+	if err := validate(ctx, key); err != nil {
+		return false, err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
-		return exist, err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.HExists(ctx, key, field).Result()
+		return false, err
 	}
 
 	return raw.Client().HExists(ctx, key, field).Result()
 }
 
-func (client *shardClient) HDelete(ctx context.Context, key string, fields ...string) (err error) {
-	defer errorx.Wrap(errType, &err, "HDelete")
-
-	if err = validateKey(key); err != nil {
+func (client *shardClient) HDelete(ctx context.Context, key string, fields ...string) error {
+	if err := validate(ctx, key); err != nil {
 		return err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
 		return err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.HDel(ctx, key, fields...).Err()
 	}
 
 	return raw.Client().HDel(ctx, key, fields...).Err()
 }
 
-func (client *shardClient) HScan(ctx context.Context, key string, cursor uint64, pattern string, count int64) (keys []string, nextCursor uint64, err error) {
-	defer errorx.Wrap(errType, &err, "HScan")
-
-	if err = validateKey(key); err != nil {
-		return keys, nextCursor, err
+func (client *shardClient) HScan(
+	ctx context.Context,
+	key string,
+	cursor uint64,
+	pattern string,
+	count int64,
+) ([]string, uint64, error) {
+	if err := validate(ctx, key); err != nil {
+		return nil, 0, err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
-		return keys, nextCursor, err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.HScan(ctx, key, cursor, pattern, count).Result()
+		return nil, 0, err
 	}
 
 	return raw.Client().HScan(ctx, key, cursor, pattern, count).Result()
 }
 
-func (client *shardClient) Scan(ctx context.Context, cursor uint64, pattern string, count int64) (keys []string, nextCursor uint64, err error) {
-	defer errorx.Wrap(errType, &err, "Scan")
+func (client *shardClient) Scan(
+	ctx context.Context,
+	cursor uint64,
+	pattern string,
+	count int64,
+) ([]string, uint64, error) {
+	if err := contextx.Validate(ctx); err != nil {
+		return nil, 0, err
+	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
-		return keys, nextCursor, err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.Scan(ctx, cursor, pattern, count).Result()
+		return nil, 0, err
 	}
 
 	return raw.Client().Scan(ctx, cursor, pattern, count).Result()
 }
 
-func (client *shardClient) HIncrBy(ctx context.Context, key, field string, incr int64) (value int64, err error) {
-	defer errorx.Wrap(errType, &err, "HIncrBy")
-
-	if err = validateKey(key); err != nil {
-		return value, err
+func (client *shardClient) HIncrBy(ctx context.Context, key, field string, incr int64) (int64, error) {
+	if err := validate(ctx, key); err != nil {
+		return 0, err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
-		return value, err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.HIncrBy(ctx, key, field, incr).Result()
+		return 0, err
 	}
 
 	return raw.Client().HIncrBy(ctx, key, field, incr).Result()
 }
 
-func (client *shardClient) HIncrByFloat(ctx context.Context, key, field string, incr float64) (value float64, err error) {
-	defer errorx.Wrap(errType, &err, "HIncrByFloat")
-
-	if err = validateKey(key); err != nil {
-		return value, err
+func (client *shardClient) HIncrByFloat(ctx context.Context, key, field string, incr float64) (float64, error) {
+	if err := validate(ctx, key); err != nil {
+		return 0, err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
-		return value, err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.HIncrByFloat(ctx, key, field, incr).Result()
+		return 0, err
 	}
 
 	return raw.Client().HIncrByFloat(ctx, key, field, incr).Result()
 }
 
-func (client *shardClient) HKeys(ctx context.Context, key string) (keys []string, err error) {
-	defer errorx.Wrap(errType, &err, "HKeys")
-
-	if err = validateKey(key); err != nil {
-		return keys, err
+func (client *shardClient) HKeys(ctx context.Context, key string) ([]string, error) {
+	if err := validate(ctx, key); err != nil {
+		return nil, err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
-		return keys, err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.HKeys(ctx, key).Result()
+		return nil, err
 	}
 
 	return raw.Client().HKeys(ctx, key).Result()
 }
 
-func (client *shardClient) HLen(ctx context.Context, key string) (length int64, err error) {
-	defer errorx.Wrap(errType, &err, "HLen")
-
-	if err = validateKey(key); err != nil {
-		return length, err
+func (client *shardClient) HLen(ctx context.Context, key string) (int64, error) {
+	if err := validate(ctx, key); err != nil {
+		return 0, err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
-		return length, err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.HLen(ctx, key).Result()
+		return 0, err
 	}
 
 	return raw.Client().HLen(ctx, key).Result()
 }
 
-func (client *shardClient) HMGet(ctx context.Context, key string, fields ...string) (result []any, err error) {
-	defer errorx.Wrap(errType, &err, "HMGet")
-
+func (client *shardClient) HMGet(ctx context.Context, key string, fields ...string) ([]any, error) {
 	if len(fields) == 0 {
 		return []any{}, nil
 	}
 
-	if err = validateKey(key); err != nil {
-		return result, err
+	if err := validate(ctx, key); err != nil {
+		return nil, err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
-		return result, err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.HMGet(ctx, key, fields...).Result()
+		return nil, err
 	}
 
 	return raw.Client().HMGet(ctx, key, fields...).Result()
 }
 
-func (client *shardClient) HMSet(ctx context.Context, key string, values ...any) (err error) {
-	defer errorx.Wrap(errType, &err, "HMSet")
-
+func (client *shardClient) HMSet(ctx context.Context, key string, values ...any) error {
 	if len(values) == 0 {
 		return nil
 	}
 
-	if err = validateKey(key); err != nil {
+	if err := validate(ctx, key); err != nil {
 		return err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
 		return err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.HMSet(ctx, key, values...).Err()
 	}
 
 	return raw.Client().HMSet(ctx, key, values...).Err()
 }
 
-func (client *shardClient) HSetNX(ctx context.Context, key, field string, value any) (err error) {
-	defer errorx.Wrap(errType, &err, "HSetNX")
-
-	if err = validateKey(key); err != nil {
+func (client *shardClient) HSetNX(ctx context.Context, key, field string, value any) error {
+	if err := validate(ctx, key); err != nil {
 		return err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
 		return err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.HSetNX(ctx, key, field, value).Err()
 	}
 
 	return raw.Client().HSetNX(ctx, key, field, value).Err()
 }
 
-func (client *shardClient) HScanNoValues(ctx context.Context, key string, cursor uint64, pattern string, count int64) (keys []string, nextCursor uint64, err error) {
-	defer errorx.Wrap(errType, &err, "HScaNoValues")
-
-	if err = validateKey(key); err != nil {
-		return keys, cursor, err
+func (client *shardClient) HScanNoValues(
+	ctx context.Context,
+	key string,
+	cursor uint64,
+	pattern string,
+	count int64,
+) ([]string, uint64, error) {
+	if err := validate(ctx, key); err != nil {
+		return nil, cursor, err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
-		return keys, nextCursor, err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.HScanNoValues(ctx, key, cursor, pattern, count).Result()
+		return nil, 0, err
 	}
 
 	return raw.Client().HScanNoValues(ctx, key, cursor, pattern, count).Result()
 }
 
-func (client *shardClient) HVals(ctx context.Context, key string) (values []string, err error) {
-	defer errorx.Wrap(errType, &err, "HVals")
-
-	if err = validateKey(key); err != nil {
-		return values, err
+func (client *shardClient) HVals(ctx context.Context, key string) ([]string, error) {
+	if err := validate(ctx, key); err != nil {
+		return nil, err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
-		return values, err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.HVals(ctx, key).Result()
+		return nil, err
 	}
 
 	return raw.Client().HVals(ctx, key).Result()
 }
 
-func (client *shardClient) HRandField(ctx context.Context, key string, count int) (keys []string, err error) {
-	defer errorx.Wrap(errType, &err, "HRandField")
-
-	if err = validateKey(key); err != nil {
-		return keys, err
+func (client *shardClient) HRandField(ctx context.Context, key string, count int) ([]string, error) {
+	if err := validate(ctx, key); err != nil {
+		return nil, err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
-		return keys, err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.HRandField(ctx, key, count).Result()
+		return nil, err
 	}
 
 	return raw.Client().HRandField(ctx, key, count).Result()
 }
 
-func (client *shardClient) HRandFieldWithValues(ctx context.Context, key string, count int) (values []redis.KeyValue, err error) {
-	defer errorx.Wrap(errType, &err, "HRandFieldWithValues")
-
-	if err = validateKey(key); err != nil {
-		return values, err
+func (client *shardClient) HRandFieldWithValues(ctx context.Context, key string, count int) ([]redis.KeyValue, error) {
+	if err := validate(ctx, key); err != nil {
+		return nil, err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
-		return values, err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.HRandFieldWithValues(ctx, key, count).Result()
+		return nil, err
 	}
 
 	return raw.Client().HRandFieldWithValues(ctx, key, count).Result()
 }
 
-func (client *shardClient) HExpire(ctx context.Context, key string, expiration time.Duration, fields ...string) (states []int64, err error) {
-	defer errorx.Wrap(errType, &err, "HExpire")
-
+func (client *shardClient) HExpire(
+	ctx context.Context,
+	key string,
+	expiration time.Duration,
+	fields ...string,
+) ([]int64, error) {
 	if len(fields) == 0 {
-		return states, nil
+		return nil, nil
 	}
 
-	if err = validateKey(key); err != nil {
-		return states, err
+	if err := validate(ctx, key); err != nil {
+		return nil, err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
-		return states, err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.HExpire(ctx, key, expiration, fields...).Result()
+		return nil, err
 	}
 
 	return raw.Client().HExpire(ctx, key, expiration, fields...).Result()
 }
 
-func (client *shardClient) HTTL(ctx context.Context, key string, fields ...string) (ttls []int64, err error) {
-	defer errorx.Wrap(errType, &err, "HTTL")
-
+func (client *shardClient) HTTL(ctx context.Context, key string, fields ...string) ([]int64, error) {
 	if len(fields) == 0 {
-		return ttls, nil
+		return nil, nil
 	}
 
-	if err = validateKey(key); err != nil {
-		return ttls, err
+	if err := validate(ctx, key); err != nil {
+		return nil, err
 	}
 
 	raw, err := client.clients.Get(ctx)
 	if err != nil {
-		return ttls, err
-	}
-
-	tx, ok := GetTx(ctx)
-	if ok {
-		return tx.HTTL(ctx, key, fields...).Result()
+		return nil, err
 	}
 
 	return raw.Client().HTTL(ctx, key, fields...).Result()

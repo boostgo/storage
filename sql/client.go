@@ -9,8 +9,6 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-const errType = "SQL"
-
 // NotFound check if provided error is not found error
 func NotFound(err error) bool {
 	return errors.Is(err, sql.ErrNoRows) || errors.Is(err, errorx.ErrNotFound)
@@ -30,7 +28,6 @@ type DB interface {
 	PrepareContext
 	EachShard(fn func(conn DB) error) error
 	EachShardAsync(fn func(conn DB) error, limit ...int) error
-	SetLogger(logger Logger) DB
 }
 
 type NamedExecContext interface {

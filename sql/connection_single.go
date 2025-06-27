@@ -2,6 +2,7 @@ package sql
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -15,9 +16,17 @@ func Connect(
 	timeout time.Duration,
 	options ...func(connection *sqlx.DB),
 ) (*sqlx.DB, error) {
+	if driverName == "" {
+		driverName = PqDriver
+	}
+
+	if driverName != PqDriver {
+		connectionString = strings.ReplaceAll(connectionString, " binary_parameters=yes", "")
+	}
+
 	connection, err := sqlx.Open(driverName, connectionString)
 	if err != nil {
-		return nil, err
+		return nil, NewOpenConnectError(err, driverName, connectionString)
 	}
 
 	// set default settings
@@ -40,7 +49,7 @@ func Connect(
 	}
 
 	if err = connection.PingContext(ctx); err != nil {
-		return nil, err
+		return nil, ErrPing.SetError(err)
 	}
 
 	return connection, nil

@@ -3,10 +3,12 @@ package sql
 import (
 	"context"
 	"database/sql"
-	"errors"
 
-	"github.com/boostgo/errorx"
+	"github.com/boostgo/contextx"
+	"github.com/boostgo/convert"
+	"github.com/boostgo/log"
 	"github.com/boostgo/storage"
+
 	"github.com/jmoiron/sqlx"
 	"golang.org/x/sync/errgroup"
 )
@@ -16,7 +18,6 @@ type ConnectionSelector func(ctx context.Context, connections []ShardConnect) Sh
 type clientShard struct {
 	connections *Connections
 	enableLog   bool
-	logger      Logger
 }
 
 // ClientShard creates DB implementation as shard client.
@@ -34,17 +35,14 @@ func ClientShard(connections *Connections, enableLog ...bool) DB {
 	}
 }
 
-func (c *clientShard) SetLogger(logger Logger) DB {
-	c.logger = logger
-	return c
-}
-
 func (c *clientShard) Connection() *sqlx.DB {
 	return nil
 }
 
-func (c *clientShard) ExecContext(ctx context.Context, query string, args ...interface{}) (result sql.Result, err error) {
-	defer errorx.Wrap(errType, &err, "ExecContext")
+func (c *clientShard) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+	if err := contextx.Validate(ctx); err != nil {
+		return nil, err
+	}
 
 	raw, err := c.selectConnect(ctx)
 	if err != nil {
@@ -60,8 +58,10 @@ func (c *clientShard) ExecContext(ctx context.Context, query string, args ...int
 	return raw.Conn().ExecContext(ctx, query, args...)
 }
 
-func (c *clientShard) QueryContext(ctx context.Context, query string, args ...interface{}) (rows *sql.Rows, err error) {
-	defer errorx.Wrap(errType, &err, "QueryContext")
+func (c *clientShard) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+	if err := contextx.Validate(ctx); err != nil {
+		return nil, err
+	}
 
 	raw, err := c.selectConnect(ctx)
 	if err != nil {
@@ -77,8 +77,10 @@ func (c *clientShard) QueryContext(ctx context.Context, query string, args ...in
 	return raw.Conn().QueryContext(ctx, query, args...)
 }
 
-func (c *clientShard) QueryxContext(ctx context.Context, query string, args ...interface{}) (rows *sqlx.Rows, err error) {
-	defer errorx.Wrap(errType, &err, "QueryxContext")
+func (c *clientShard) QueryxContext(ctx context.Context, query string, args ...interface{}) (*sqlx.Rows, error) {
+	if err := contextx.Validate(ctx); err != nil {
+		return nil, err
+	}
 
 	raw, err := c.selectConnect(ctx)
 	if err != nil {
@@ -110,8 +112,10 @@ func (c *clientShard) QueryRowxContext(ctx context.Context, query string, args .
 	return raw.Conn().QueryRowxContext(ctx, query, args...)
 }
 
-func (c *clientShard) PrepareContext(ctx context.Context, query string) (statement *sql.Stmt, err error) {
-	defer errorx.Wrap(errType, &err, "PrepareContext")
+func (c *clientShard) PrepareContext(ctx context.Context, query string) (*sql.Stmt, error) {
+	if err := contextx.Validate(ctx); err != nil {
+		return nil, err
+	}
 
 	raw, err := c.selectConnect(ctx)
 	if err != nil {
@@ -127,8 +131,10 @@ func (c *clientShard) PrepareContext(ctx context.Context, query string) (stateme
 	return raw.Conn().PrepareContext(ctx, query)
 }
 
-func (c *clientShard) NamedExecContext(ctx context.Context, query string, arg interface{}) (result sql.Result, err error) {
-	defer errorx.Wrap(errType, &err, "NamedExecContext")
+func (c *clientShard) NamedExecContext(ctx context.Context, query string, arg interface{}) (sql.Result, error) {
+	if err := contextx.Validate(ctx); err != nil {
+		return nil, err
+	}
 
 	raw, err := c.selectConnect(ctx)
 	if err != nil {
@@ -144,8 +150,10 @@ func (c *clientShard) NamedExecContext(ctx context.Context, query string, arg in
 	return raw.Conn().NamedExecContext(ctx, query, arg)
 }
 
-func (c *clientShard) SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) (err error) {
-	defer errorx.Wrap(errType, &err, "SelectContext")
+func (c *clientShard) SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
+	if err := contextx.Validate(ctx); err != nil {
+		return err
+	}
 
 	raw, err := c.selectConnect(ctx)
 	if err != nil {
@@ -161,8 +169,10 @@ func (c *clientShard) SelectContext(ctx context.Context, dest interface{}, query
 	return raw.Conn().SelectContext(ctx, dest, query, args...)
 }
 
-func (c *clientShard) GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) (err error) {
-	defer errorx.Wrap(errType, &err, "GetContext")
+func (c *clientShard) GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
+	if err := contextx.Validate(ctx); err != nil {
+		return err
+	}
 
 	raw, err := c.selectConnect(ctx)
 	if err != nil {
@@ -178,8 +188,10 @@ func (c *clientShard) GetContext(ctx context.Context, dest interface{}, query st
 	return raw.Conn().GetContext(ctx, dest, query, args...)
 }
 
-func (c *clientShard) PrepareNamedContext(ctx context.Context, query string) (statement *sqlx.NamedStmt, err error) {
-	defer errorx.Wrap(errType, &err, "PrepareNamedContext")
+func (c *clientShard) PrepareNamedContext(ctx context.Context, query string) (*sqlx.NamedStmt, error) {
+	if err := contextx.Validate(ctx); err != nil {
+		return nil, err
+	}
 
 	raw, err := c.selectConnect(ctx)
 	if err != nil {
@@ -197,23 +209,35 @@ func (c *clientShard) PrepareNamedContext(ctx context.Context, query string) (st
 }
 
 // EachShard runs provided fn function with every shard single connection
-func (c *clientShard) EachShard(fn func(conn DB) error) (err error) {
+func (c *clientShard) EachShard(fn func(conn DB) error) error {
 	return EachShard(c, fn)
 }
 
 // EachShardAsync do the same as EachShard but in parallel every shard.
 //
 // If provide "limit", count of goroutines will be limited
-func (c *clientShard) EachShardAsync(fn func(conn DB) error, limit ...int) (err error) {
+func (c *clientShard) EachShardAsync(fn func(conn DB) error, limit ...int) error {
 	return EachShardAsync(c, fn, limit...)
 }
 
 func (c *clientShard) printLog(ctx context.Context, connectionKey, queryType, query string, args ...any) {
-	if !c.enableLog || storage.IsNoLog(ctx) || c.logger == nil {
+	if !c.enableLog || storage.IsNoLog(ctx) {
 		return
 	}
 
-	c.logger.Print(ctx, connectionKey, queryType, query, args)
+	convertedArgs := make([]string, 0, len(args))
+	for _, arg := range args {
+		convertedArgs = append(convertedArgs, convert.String(arg))
+	}
+
+	log.
+		Info().
+		Ctx(ctx).
+		Str("connection_key", connectionKey).
+		Str("query_type", queryType).
+		Str("query", query).
+		Strs("args", convertedArgs).
+		Send()
 }
 
 func (c *clientShard) selectConnect(ctx context.Context) (ShardConnect, error) {
@@ -224,7 +248,7 @@ func (c *clientShard) selectConnect(ctx context.Context) (ShardConnect, error) {
 func EachShard(conn DB, fn func(conn DB) error) (err error) {
 	shardClient, ok := conn.(*clientShard)
 	if !ok {
-		return errors.New("provided conn is not shard client")
+		return ErrConnectionIsNotShard
 	}
 
 	for _, shard := range shardClient.connections.connections {
@@ -242,7 +266,7 @@ func EachShard(conn DB, fn func(conn DB) error) (err error) {
 func EachShardAsync(conn DB, fn func(conn DB) error, limit ...int) (err error) {
 	shardClient, ok := conn.(*clientShard)
 	if !ok {
-		return errors.New("provided conn is not shard client")
+		return ErrConnectionIsNotShard
 	}
 
 	wg := errgroup.Group{}

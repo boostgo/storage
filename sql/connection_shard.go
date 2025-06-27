@@ -66,15 +66,13 @@ func ConnectShards(
 		}
 
 		if cs.ConnectionString == "" {
-			return nil, errorx.
-				New("Connection string is empty").
-				AddContext("key", cs.Key)
+			return nil, ErrConnectionStringEmpty.
+				AddParam("key", cs.Key)
 		}
 
 		if _, ok := keys[cs.Key]; ok {
-			return nil, errorx.
-				New("Connection keys cannot duplicate").
-				AddContext("key", cs.Key)
+			return nil, ErrConnectionStringDuplicate.
+				AddParam("key", cs.Key)
 		}
 
 		keys[cs.Key] = struct{}{}
@@ -100,7 +98,8 @@ func MustConnectShards(
 	connectionStrings []ShardConnectString,
 	selector ConnectionSelector,
 	timeout time.Duration,
-	options ...func(connection *sqlx.DB)) *Connections {
+	options ...func(connection *sqlx.DB),
+) *Connections {
 	connections, err := ConnectShards(driverName, connectionStrings, selector, timeout, options...)
 	if err != nil {
 		panic(err)

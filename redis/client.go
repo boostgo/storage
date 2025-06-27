@@ -2,18 +2,13 @@ package redis
 
 import (
 	"context"
-	"errors"
 	"io"
 	"slices"
 	"time"
 
+	"github.com/boostgo/contextx"
+
 	"github.com/redis/go-redis/v9"
-)
-
-const errType = "Redis"
-
-var (
-	ErrKeyEmpty = errors.New("key is empty")
 )
 
 type Client interface {
@@ -62,7 +57,11 @@ type Client interface {
 	HTTL(ctx context.Context, key string, fields ...string) ([]int64, error)
 }
 
-func validateKey(key string) error {
+func validate(ctx context.Context, key string) error {
+	if err := contextx.Validate(ctx); err != nil {
+		return err
+	}
+
 	if key == "" {
 		return ErrKeyEmpty
 	}
@@ -70,8 +69,15 @@ func validateKey(key string) error {
 	return nil
 }
 
-func validateKeys(keys []string) {
+// nolint:ineffassign
+func validateMultiple(ctx context.Context, keys []string) error {
+	if err := contextx.Validate(ctx); err != nil {
+		return err
+	}
+
 	keys = slices.DeleteFunc(keys, func(key string) bool {
-		return validateKey(key) != nil
+		return validate(context.Background(), key) != nil
 	})
+
+	return nil
 }
