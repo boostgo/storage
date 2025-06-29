@@ -29,29 +29,29 @@ func NewShard(clients *Clients) Client {
 	}
 }
 
-func (client *shardClient) Close() error {
-	return client.clients.Close()
+func (c *shardClient) Close() error {
+	return c.clients.Close()
 }
 
-func (client *shardClient) Client(ctx context.Context) (redis.UniversalClient, error) {
+func (c *shardClient) Client(ctx context.Context) (redis.UniversalClient, error) {
 	if err := contextx.Validate(ctx); err != nil {
 		return nil, err
 	}
 
-	c, err := client.clients.Get(ctx)
+	client, err := c.clients.Get(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return c.Client(), nil
+	return client.Client(), nil
 }
 
-func (client *shardClient) Pipeline(ctx context.Context) (redis.Pipeliner, error) {
+func (c *shardClient) Pipeline(ctx context.Context) (redis.Pipeliner, error) {
 	if err := contextx.Validate(ctx); err != nil {
 		return nil, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -59,12 +59,12 @@ func (client *shardClient) Pipeline(ctx context.Context) (redis.Pipeliner, error
 	return raw.Client().Pipeline(), nil
 }
 
-func (client *shardClient) TxPipeline(ctx context.Context) (redis.Pipeliner, error) {
+func (c *shardClient) TxPipeline(ctx context.Context) (redis.Pipeliner, error) {
 	if err := contextx.Validate(ctx); err != nil {
 		return nil, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -72,12 +72,12 @@ func (client *shardClient) TxPipeline(ctx context.Context) (redis.Pipeliner, err
 	return raw.Client().TxPipeline(), nil
 }
 
-func (client *shardClient) Keys(ctx context.Context, pattern string) ([]string, error) {
+func (c *shardClient) Keys(ctx context.Context, pattern string) ([]string, error) {
 	if err := contextx.Validate(ctx); err != nil {
 		return nil, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func (client *shardClient) Keys(ctx context.Context, pattern string) ([]string, 
 	return raw.Client().Keys(ctx, pattern).Result()
 }
 
-func (client *shardClient) Delete(ctx context.Context, keys ...string) error {
+func (c *shardClient) Delete(ctx context.Context, keys ...string) error {
 	if err := contextx.Validate(ctx); err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func (client *shardClient) Delete(ctx context.Context, keys ...string) error {
 		return nil
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return err
 	}
@@ -111,12 +111,12 @@ func (client *shardClient) Delete(ctx context.Context, keys ...string) error {
 	return raw.Client().Del(ctx, keys...).Err()
 }
 
-func (client *shardClient) Dump(ctx context.Context, key string) (string, error) {
+func (c *shardClient) Dump(ctx context.Context, key string) (string, error) {
 	if err := validate(ctx, key); err != nil {
 		return "", err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -124,7 +124,7 @@ func (client *shardClient) Dump(ctx context.Context, key string) (string, error)
 	return raw.Client().Dump(ctx, key).Result()
 }
 
-func (client *shardClient) Rename(ctx context.Context, oldKey, newKey string) error {
+func (c *shardClient) Rename(ctx context.Context, oldKey, newKey string) error {
 	if err := validate(ctx, oldKey); err != nil {
 		return ErrInvalidKey.
 			SetError(err).
@@ -137,7 +137,7 @@ func (client *shardClient) Rename(ctx context.Context, oldKey, newKey string) er
 			AddParam("key_type", "new")
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return err
 	}
@@ -145,12 +145,12 @@ func (client *shardClient) Rename(ctx context.Context, oldKey, newKey string) er
 	return raw.Client().Rename(ctx, oldKey, newKey).Err()
 }
 
-func (client *shardClient) Refresh(ctx context.Context, key string, ttl time.Duration) error {
+func (c *shardClient) Refresh(ctx context.Context, key string, ttl time.Duration) error {
 	if err := validate(ctx, key); err != nil {
 		return err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return err
 	}
@@ -158,12 +158,12 @@ func (client *shardClient) Refresh(ctx context.Context, key string, ttl time.Dur
 	return raw.Client().Expire(ctx, key, ttl).Err()
 }
 
-func (client *shardClient) RefreshAt(ctx context.Context, key string, at time.Time) error {
+func (c *shardClient) RefreshAt(ctx context.Context, key string, at time.Time) error {
 	if err := validate(ctx, key); err != nil {
 		return err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return err
 	}
@@ -171,12 +171,12 @@ func (client *shardClient) RefreshAt(ctx context.Context, key string, at time.Ti
 	return raw.Client().ExpireAt(ctx, key, at).Err()
 }
 
-func (client *shardClient) TTL(ctx context.Context, key string) (time.Duration, error) {
+func (c *shardClient) TTL(ctx context.Context, key string) (time.Duration, error) {
 	if err := validate(ctx, key); err != nil {
 		return 0, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -194,7 +194,7 @@ func (client *shardClient) TTL(ctx context.Context, key string) (time.Duration, 
 	return ttl, nil
 }
 
-func (client *shardClient) Set(ctx context.Context, key string, value any, ttl ...time.Duration) error {
+func (c *shardClient) Set(ctx context.Context, key string, value any, ttl ...time.Duration) error {
 	if err := validate(ctx, key); err != nil {
 		return err
 	}
@@ -204,7 +204,7 @@ func (client *shardClient) Set(ctx context.Context, key string, value any, ttl .
 		expireAt = ttl[0]
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return err
 	}
@@ -212,12 +212,25 @@ func (client *shardClient) Set(ctx context.Context, key string, value any, ttl .
 	return raw.Client().Set(ctx, key, value, expireAt).Err()
 }
 
-func (client *shardClient) Get(ctx context.Context, key string) (string, error) {
+func (c *shardClient) SetNX(ctx context.Context, key string, value any, ttl time.Duration) (bool, error) {
+	if err := validate(ctx, key); err != nil {
+		return false, err
+	}
+
+	raw, err := c.clients.Get(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	return raw.Client().SetNX(ctx, key, value, ttl).Result()
+}
+
+func (c *shardClient) Get(ctx context.Context, key string) (string, error) {
 	if err := validate(ctx, key); err != nil {
 		return "", err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -235,12 +248,12 @@ func (client *shardClient) Get(ctx context.Context, key string) (string, error) 
 	return result, nil
 }
 
-func (client *shardClient) MGet(ctx context.Context, keys []string) ([]any, error) {
+func (c *shardClient) MGet(ctx context.Context, keys []string) ([]any, error) {
 	if err := validateMultiple(ctx, keys); err != nil {
 		return nil, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -253,12 +266,12 @@ func (client *shardClient) MGet(ctx context.Context, keys []string) ([]any, erro
 	return result, nil
 }
 
-func (client *shardClient) Exist(ctx context.Context, key string) (int64, error) {
+func (c *shardClient) Exist(ctx context.Context, key string) (int64, error) {
 	if err := validate(ctx, key); err != nil {
 		return 0, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -266,12 +279,12 @@ func (client *shardClient) Exist(ctx context.Context, key string) (int64, error)
 	return raw.Client().Exists(ctx, key).Result()
 }
 
-func (client *shardClient) GetBytes(ctx context.Context, key string) ([]byte, error) {
+func (c *shardClient) GetBytes(ctx context.Context, key string) ([]byte, error) {
 	if err := validate(ctx, key); err != nil {
 		return nil, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -289,12 +302,12 @@ func (client *shardClient) GetBytes(ctx context.Context, key string) ([]byte, er
 	return result, nil
 }
 
-func (client *shardClient) GetInt(ctx context.Context, key string) (int, error) {
+func (c *shardClient) GetInt(ctx context.Context, key string) (int, error) {
 	if err := validate(ctx, key); err != nil {
 		return 0, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -312,12 +325,12 @@ func (client *shardClient) GetInt(ctx context.Context, key string) (int, error) 
 	return result, nil
 }
 
-func (client *shardClient) Parse(ctx context.Context, key string, export any) error {
+func (c *shardClient) Parse(ctx context.Context, key string, export any) error {
 	if err := validate(ctx, key); err != nil {
 		return err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return err
 	}
@@ -336,12 +349,12 @@ func (client *shardClient) Parse(ctx context.Context, key string, export any) er
 	return json.Unmarshal(result, &export)
 }
 
-func (client *shardClient) HSet(ctx context.Context, key string, value map[string]any) error {
+func (c *shardClient) HSet(ctx context.Context, key string, value map[string]any) error {
 	if err := validate(ctx, key); err != nil {
 		return err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return err
 	}
@@ -349,12 +362,12 @@ func (client *shardClient) HSet(ctx context.Context, key string, value map[strin
 	return raw.Client().HSet(ctx, key, value).Err()
 }
 
-func (client *shardClient) HGetAll(ctx context.Context, key string) (map[string]string, error) {
+func (c *shardClient) HGetAll(ctx context.Context, key string) (map[string]string, error) {
 	if err := validate(ctx, key); err != nil {
 		return nil, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -362,12 +375,12 @@ func (client *shardClient) HGetAll(ctx context.Context, key string) (map[string]
 	return raw.Client().HGetAll(ctx, key).Result()
 }
 
-func (client *shardClient) HGet(ctx context.Context, key, field string) (string, error) {
+func (c *shardClient) HGet(ctx context.Context, key, field string) (string, error) {
 	if err := validate(ctx, key); err != nil {
 		return "", err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -375,12 +388,12 @@ func (client *shardClient) HGet(ctx context.Context, key, field string) (string,
 	return raw.Client().HGet(ctx, key, field).Result()
 }
 
-func (client *shardClient) HGetInt(ctx context.Context, key, field string) (int, error) {
+func (c *shardClient) HGetInt(ctx context.Context, key, field string) (int, error) {
 	if err := validate(ctx, key); err != nil {
 		return 0, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -388,12 +401,12 @@ func (client *shardClient) HGetInt(ctx context.Context, key, field string) (int,
 	return raw.Client().HGet(ctx, key, field).Int()
 }
 
-func (client *shardClient) HGetBool(ctx context.Context, key, field string) (bool, error) {
+func (c *shardClient) HGetBool(ctx context.Context, key, field string) (bool, error) {
 	if err := validate(ctx, key); err != nil {
 		return false, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -401,12 +414,12 @@ func (client *shardClient) HGetBool(ctx context.Context, key, field string) (boo
 	return raw.Client().HGet(ctx, key, field).Bool()
 }
 
-func (client *shardClient) HExist(ctx context.Context, key, field string) (bool, error) {
+func (c *shardClient) HExist(ctx context.Context, key, field string) (bool, error) {
 	if err := validate(ctx, key); err != nil {
 		return false, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -414,12 +427,12 @@ func (client *shardClient) HExist(ctx context.Context, key, field string) (bool,
 	return raw.Client().HExists(ctx, key, field).Result()
 }
 
-func (client *shardClient) HDelete(ctx context.Context, key string, fields ...string) error {
+func (c *shardClient) HDelete(ctx context.Context, key string, fields ...string) error {
 	if err := validate(ctx, key); err != nil {
 		return err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return err
 	}
@@ -427,7 +440,7 @@ func (client *shardClient) HDelete(ctx context.Context, key string, fields ...st
 	return raw.Client().HDel(ctx, key, fields...).Err()
 }
 
-func (client *shardClient) HScan(
+func (c *shardClient) HScan(
 	ctx context.Context,
 	key string,
 	cursor uint64,
@@ -438,7 +451,7 @@ func (client *shardClient) HScan(
 		return nil, 0, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -446,7 +459,7 @@ func (client *shardClient) HScan(
 	return raw.Client().HScan(ctx, key, cursor, pattern, count).Result()
 }
 
-func (client *shardClient) Scan(
+func (c *shardClient) Scan(
 	ctx context.Context,
 	cursor uint64,
 	pattern string,
@@ -456,7 +469,7 @@ func (client *shardClient) Scan(
 		return nil, 0, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -464,12 +477,12 @@ func (client *shardClient) Scan(
 	return raw.Client().Scan(ctx, cursor, pattern, count).Result()
 }
 
-func (client *shardClient) HIncrBy(ctx context.Context, key, field string, incr int64) (int64, error) {
+func (c *shardClient) HIncrBy(ctx context.Context, key, field string, incr int64) (int64, error) {
 	if err := validate(ctx, key); err != nil {
 		return 0, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -477,12 +490,12 @@ func (client *shardClient) HIncrBy(ctx context.Context, key, field string, incr 
 	return raw.Client().HIncrBy(ctx, key, field, incr).Result()
 }
 
-func (client *shardClient) HIncrByFloat(ctx context.Context, key, field string, incr float64) (float64, error) {
+func (c *shardClient) HIncrByFloat(ctx context.Context, key, field string, incr float64) (float64, error) {
 	if err := validate(ctx, key); err != nil {
 		return 0, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -490,12 +503,12 @@ func (client *shardClient) HIncrByFloat(ctx context.Context, key, field string, 
 	return raw.Client().HIncrByFloat(ctx, key, field, incr).Result()
 }
 
-func (client *shardClient) HKeys(ctx context.Context, key string) ([]string, error) {
+func (c *shardClient) HKeys(ctx context.Context, key string) ([]string, error) {
 	if err := validate(ctx, key); err != nil {
 		return nil, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -503,12 +516,12 @@ func (client *shardClient) HKeys(ctx context.Context, key string) ([]string, err
 	return raw.Client().HKeys(ctx, key).Result()
 }
 
-func (client *shardClient) HLen(ctx context.Context, key string) (int64, error) {
+func (c *shardClient) HLen(ctx context.Context, key string) (int64, error) {
 	if err := validate(ctx, key); err != nil {
 		return 0, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -516,7 +529,7 @@ func (client *shardClient) HLen(ctx context.Context, key string) (int64, error) 
 	return raw.Client().HLen(ctx, key).Result()
 }
 
-func (client *shardClient) HMGet(ctx context.Context, key string, fields ...string) ([]any, error) {
+func (c *shardClient) HMGet(ctx context.Context, key string, fields ...string) ([]any, error) {
 	if len(fields) == 0 {
 		return []any{}, nil
 	}
@@ -525,7 +538,7 @@ func (client *shardClient) HMGet(ctx context.Context, key string, fields ...stri
 		return nil, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -533,7 +546,7 @@ func (client *shardClient) HMGet(ctx context.Context, key string, fields ...stri
 	return raw.Client().HMGet(ctx, key, fields...).Result()
 }
 
-func (client *shardClient) HMSet(ctx context.Context, key string, values ...any) error {
+func (c *shardClient) HMSet(ctx context.Context, key string, values ...any) error {
 	if len(values) == 0 {
 		return nil
 	}
@@ -542,7 +555,7 @@ func (client *shardClient) HMSet(ctx context.Context, key string, values ...any)
 		return err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return err
 	}
@@ -550,12 +563,12 @@ func (client *shardClient) HMSet(ctx context.Context, key string, values ...any)
 	return raw.Client().HMSet(ctx, key, values...).Err()
 }
 
-func (client *shardClient) HSetNX(ctx context.Context, key, field string, value any) error {
+func (c *shardClient) HSetNX(ctx context.Context, key, field string, value any) error {
 	if err := validate(ctx, key); err != nil {
 		return err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return err
 	}
@@ -563,7 +576,7 @@ func (client *shardClient) HSetNX(ctx context.Context, key, field string, value 
 	return raw.Client().HSetNX(ctx, key, field, value).Err()
 }
 
-func (client *shardClient) HScanNoValues(
+func (c *shardClient) HScanNoValues(
 	ctx context.Context,
 	key string,
 	cursor uint64,
@@ -574,7 +587,7 @@ func (client *shardClient) HScanNoValues(
 		return nil, cursor, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -582,12 +595,12 @@ func (client *shardClient) HScanNoValues(
 	return raw.Client().HScanNoValues(ctx, key, cursor, pattern, count).Result()
 }
 
-func (client *shardClient) HVals(ctx context.Context, key string) ([]string, error) {
+func (c *shardClient) HVals(ctx context.Context, key string) ([]string, error) {
 	if err := validate(ctx, key); err != nil {
 		return nil, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -595,12 +608,12 @@ func (client *shardClient) HVals(ctx context.Context, key string) ([]string, err
 	return raw.Client().HVals(ctx, key).Result()
 }
 
-func (client *shardClient) HRandField(ctx context.Context, key string, count int) ([]string, error) {
+func (c *shardClient) HRandField(ctx context.Context, key string, count int) ([]string, error) {
 	if err := validate(ctx, key); err != nil {
 		return nil, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -608,12 +621,12 @@ func (client *shardClient) HRandField(ctx context.Context, key string, count int
 	return raw.Client().HRandField(ctx, key, count).Result()
 }
 
-func (client *shardClient) HRandFieldWithValues(ctx context.Context, key string, count int) ([]redis.KeyValue, error) {
+func (c *shardClient) HRandFieldWithValues(ctx context.Context, key string, count int) ([]redis.KeyValue, error) {
 	if err := validate(ctx, key); err != nil {
 		return nil, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -621,7 +634,7 @@ func (client *shardClient) HRandFieldWithValues(ctx context.Context, key string,
 	return raw.Client().HRandFieldWithValues(ctx, key, count).Result()
 }
 
-func (client *shardClient) HExpire(
+func (c *shardClient) HExpire(
 	ctx context.Context,
 	key string,
 	expiration time.Duration,
@@ -635,7 +648,7 @@ func (client *shardClient) HExpire(
 		return nil, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -643,7 +656,7 @@ func (client *shardClient) HExpire(
 	return raw.Client().HExpire(ctx, key, expiration, fields...).Result()
 }
 
-func (client *shardClient) HTTL(ctx context.Context, key string, fields ...string) ([]int64, error) {
+func (c *shardClient) HTTL(ctx context.Context, key string, fields ...string) ([]int64, error) {
 	if len(fields) == 0 {
 		return nil, nil
 	}
@@ -652,12 +665,29 @@ func (client *shardClient) HTTL(ctx context.Context, key string, fields ...strin
 		return nil, err
 	}
 
-	raw, err := client.clients.Get(ctx)
+	raw, err := c.clients.Get(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	return raw.Client().HTTL(ctx, key, fields...).Result()
+}
+
+func (c *shardClient) Eval(ctx context.Context, script string, keys []string, args ...any) (any, error) {
+	if len(keys) == 0 {
+		return nil, nil
+	}
+
+	if err := validateMultiple(ctx, keys); err != nil {
+		return nil, err
+	}
+
+	raw, err := c.clients.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return raw.Client().Eval(ctx, script, keys, args...).Result()
 }
 
 type ShardClient interface {

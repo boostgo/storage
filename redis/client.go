@@ -26,6 +26,7 @@ type Client interface {
 	RefreshAt(ctx context.Context, key string, at time.Time) error
 	TTL(ctx context.Context, key string) (time.Duration, error)
 	Set(ctx context.Context, key string, value any, ttl ...time.Duration) error
+	SetNX(ctx context.Context, key string, value any, ttl time.Duration) (bool, error)
 	Get(ctx context.Context, key string) (string, error)
 	MGet(ctx context.Context, keys []string) ([]any, error)
 	Exist(ctx context.Context, key string) (int64, error)
@@ -55,6 +56,8 @@ type Client interface {
 	HRandFieldWithValues(ctx context.Context, key string, count int) ([]redis.KeyValue, error)
 	HExpire(ctx context.Context, key string, expiration time.Duration, fields ...string) ([]int64, error)
 	HTTL(ctx context.Context, key string, fields ...string) ([]int64, error)
+
+	Eval(ctx context.Context, script string, keys []string, args ...any) (any, error)
 }
 
 func validate(ctx context.Context, key string) error {

@@ -42,43 +42,43 @@ func NewFromClient(conn *redis.Client) Client {
 	}
 }
 
-func (client *singleClient) Close() error {
-	return client.client.Close()
+func (c *singleClient) Close() error {
+	return c.client.Close()
 }
 
-func (client *singleClient) Client(ctx context.Context) (redis.UniversalClient, error) {
+func (c *singleClient) Client(ctx context.Context) (redis.UniversalClient, error) {
 	if err := contextx.Validate(ctx); err != nil {
 		return nil, err
 	}
 
-	return client.client, nil
+	return c.client, nil
 }
 
-func (client *singleClient) Pipeline(ctx context.Context) (redis.Pipeliner, error) {
+func (c *singleClient) Pipeline(ctx context.Context) (redis.Pipeliner, error) {
 	if err := contextx.Validate(ctx); err != nil {
 		return nil, err
 	}
 
-	return client.client.Pipeline(), nil
+	return c.client.Pipeline(), nil
 }
 
-func (client *singleClient) TxPipeline(ctx context.Context) (redis.Pipeliner, error) {
+func (c *singleClient) TxPipeline(ctx context.Context) (redis.Pipeliner, error) {
 	if err := contextx.Validate(ctx); err != nil {
 		return nil, err
 	}
 
-	return client.client.TxPipeline(), nil
+	return c.client.TxPipeline(), nil
 }
 
-func (client *singleClient) Keys(ctx context.Context, pattern string) ([]string, error) {
+func (c *singleClient) Keys(ctx context.Context, pattern string) ([]string, error) {
 	if err := contextx.Validate(ctx); err != nil {
 		return nil, err
 	}
 
-	return client.client.Keys(ctx, pattern).Result()
+	return c.client.Keys(ctx, pattern).Result()
 }
 
-func (client *singleClient) Delete(ctx context.Context, keys ...string) error {
+func (c *singleClient) Delete(ctx context.Context, keys ...string) error {
 	if err := contextx.Validate(ctx); err != nil {
 		return err
 	}
@@ -96,18 +96,18 @@ func (client *singleClient) Delete(ctx context.Context, keys ...string) error {
 		return nil
 	}
 
-	return client.client.Del(ctx, keys...).Err()
+	return c.client.Del(ctx, keys...).Err()
 }
 
-func (client *singleClient) Dump(ctx context.Context, key string) (string, error) {
+func (c *singleClient) Dump(ctx context.Context, key string) (string, error) {
 	if err := validate(ctx, key); err != nil {
 		return "", err
 	}
 
-	return client.client.Dump(ctx, key).Result()
+	return c.client.Dump(ctx, key).Result()
 }
 
-func (client *singleClient) Rename(ctx context.Context, oldKey, newKey string) error {
+func (c *singleClient) Rename(ctx context.Context, oldKey, newKey string) error {
 	if err := validate(ctx, oldKey); err != nil {
 		return ErrInvalidKey.
 			SetError(err).
@@ -120,31 +120,31 @@ func (client *singleClient) Rename(ctx context.Context, oldKey, newKey string) e
 			AddParam("key_type", "new")
 	}
 
-	return client.client.Rename(ctx, oldKey, newKey).Err()
+	return c.client.Rename(ctx, oldKey, newKey).Err()
 }
 
-func (client *singleClient) Refresh(ctx context.Context, key string, ttl time.Duration) error {
+func (c *singleClient) Refresh(ctx context.Context, key string, ttl time.Duration) error {
 	if err := validate(ctx, key); err != nil {
 		return err
 	}
 
-	return client.client.Expire(ctx, key, ttl).Err()
+	return c.client.Expire(ctx, key, ttl).Err()
 }
 
-func (client *singleClient) RefreshAt(ctx context.Context, key string, at time.Time) error {
+func (c *singleClient) RefreshAt(ctx context.Context, key string, at time.Time) error {
 	if err := validate(ctx, key); err != nil {
 		return err
 	}
 
-	return client.client.ExpireAt(ctx, key, at).Err()
+	return c.client.ExpireAt(ctx, key, at).Err()
 }
 
-func (client *singleClient) TTL(ctx context.Context, key string) (time.Duration, error) {
+func (c *singleClient) TTL(ctx context.Context, key string) (time.Duration, error) {
 	if err := validate(ctx, key); err != nil {
 		return 0, err
 	}
 
-	ttl, err := client.client.TTL(ctx, key).Result()
+	ttl, err := c.client.TTL(ctx, key).Result()
 	if err != nil {
 		return ttl, err
 	}
@@ -157,7 +157,7 @@ func (client *singleClient) TTL(ctx context.Context, key string) (time.Duration,
 	return ttl, nil
 }
 
-func (client *singleClient) Set(ctx context.Context, key string, value any, ttl ...time.Duration) error {
+func (c *singleClient) Set(ctx context.Context, key string, value any, ttl ...time.Duration) error {
 	if err := validate(ctx, key); err != nil {
 		return err
 	}
@@ -167,15 +167,23 @@ func (client *singleClient) Set(ctx context.Context, key string, value any, ttl 
 		expireAt = ttl[0]
 	}
 
-	return client.client.Set(ctx, key, value, expireAt).Err()
+	return c.client.Set(ctx, key, value, expireAt).Err()
 }
 
-func (client *singleClient) Get(ctx context.Context, key string) (string, error) {
+func (c *singleClient) SetNX(ctx context.Context, key string, value any, ttl time.Duration) (bool, error) {
+	if err := validate(ctx, key); err != nil {
+		return false, err
+	}
+
+	return c.client.SetNX(ctx, key, value, ttl).Result()
+}
+
+func (c *singleClient) Get(ctx context.Context, key string) (string, error) {
 	if err := validate(ctx, key); err != nil {
 		return "", err
 	}
 
-	result, err := client.client.Get(ctx, key).Result()
+	result, err := c.client.Get(ctx, key).Result()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
 			return result, ErrKeyNotFound.
@@ -188,28 +196,28 @@ func (client *singleClient) Get(ctx context.Context, key string) (string, error)
 	return result, nil
 }
 
-func (client *singleClient) MGet(ctx context.Context, keys []string) ([]any, error) {
+func (c *singleClient) MGet(ctx context.Context, keys []string) ([]any, error) {
 	if err := contextx.Validate(ctx); err != nil {
 		return nil, err
 	}
 
-	return client.client.MGet(ctx, keys...).Result()
+	return c.client.MGet(ctx, keys...).Result()
 }
 
-func (client *singleClient) Exist(ctx context.Context, key string) (int64, error) {
+func (c *singleClient) Exist(ctx context.Context, key string) (int64, error) {
 	if err := validate(ctx, key); err != nil {
 		return 0, err
 	}
 
-	return client.client.Exists(ctx, key).Result()
+	return c.client.Exists(ctx, key).Result()
 }
 
-func (client *singleClient) GetBytes(ctx context.Context, key string) ([]byte, error) {
+func (c *singleClient) GetBytes(ctx context.Context, key string) ([]byte, error) {
 	if err := validate(ctx, key); err != nil {
 		return nil, err
 	}
 
-	result, err := client.client.Get(ctx, key).Bytes()
+	result, err := c.client.Get(ctx, key).Bytes()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
 			return result, ErrKeyNotFound.
@@ -222,12 +230,12 @@ func (client *singleClient) GetBytes(ctx context.Context, key string) ([]byte, e
 	return result, nil
 }
 
-func (client *singleClient) GetInt(ctx context.Context, key string) (int, error) {
+func (c *singleClient) GetInt(ctx context.Context, key string) (int, error) {
 	if err := validate(ctx, key); err != nil {
 		return 0, err
 	}
 
-	result, err := client.client.Get(ctx, key).Int()
+	result, err := c.client.Get(ctx, key).Int()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
 			return result, ErrKeyNotFound.
@@ -240,12 +248,12 @@ func (client *singleClient) GetInt(ctx context.Context, key string) (int, error)
 	return result, nil
 }
 
-func (client *singleClient) Parse(ctx context.Context, key string, export any) error {
+func (c *singleClient) Parse(ctx context.Context, key string, export any) error {
 	if err := validate(ctx, key); err != nil {
 		return err
 	}
 
-	result, err := client.client.Get(ctx, key).Bytes()
+	result, err := c.client.Get(ctx, key).Bytes()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
 			return ErrKeyNotFound.
@@ -258,55 +266,55 @@ func (client *singleClient) Parse(ctx context.Context, key string, export any) e
 	return json.Unmarshal(result, &export)
 }
 
-func (client *singleClient) HSet(ctx context.Context, key string, value map[string]any) error {
+func (c *singleClient) HSet(ctx context.Context, key string, value map[string]any) error {
 	if err := validate(ctx, key); err != nil {
 		return err
 	}
 
-	return client.client.HSet(ctx, key, value).Err()
+	return c.client.HSet(ctx, key, value).Err()
 }
 
-func (client *singleClient) HGetAll(ctx context.Context, key string) (map[string]string, error) {
+func (c *singleClient) HGetAll(ctx context.Context, key string) (map[string]string, error) {
 	if err := validate(ctx, key); err != nil {
 		return nil, err
 	}
 
-	return client.client.HGetAll(ctx, key).Result()
+	return c.client.HGetAll(ctx, key).Result()
 }
 
-func (client *singleClient) HGet(ctx context.Context, key, field string) (string, error) {
+func (c *singleClient) HGet(ctx context.Context, key, field string) (string, error) {
 	if err := validate(ctx, key); err != nil {
 		return "", err
 	}
 
-	return client.client.HGet(ctx, key, field).Result()
+	return c.client.HGet(ctx, key, field).Result()
 }
 
-func (client *singleClient) HGetInt(ctx context.Context, key, field string) (int, error) {
+func (c *singleClient) HGetInt(ctx context.Context, key, field string) (int, error) {
 	if err := validate(ctx, key); err != nil {
 		return 0, err
 	}
 
-	return client.client.HGet(ctx, key, field).Int()
+	return c.client.HGet(ctx, key, field).Int()
 }
 
-func (client *singleClient) HGetBool(ctx context.Context, key, field string) (bool, error) {
+func (c *singleClient) HGetBool(ctx context.Context, key, field string) (bool, error) {
 	if err := validate(ctx, key); err != nil {
 		return false, err
 	}
 
-	return client.client.HGet(ctx, key, field).Bool()
+	return c.client.HGet(ctx, key, field).Bool()
 }
 
-func (client *singleClient) HExist(ctx context.Context, key, field string) (bool, error) {
+func (c *singleClient) HExist(ctx context.Context, key, field string) (bool, error) {
 	if err := validate(ctx, key); err != nil {
 		return false, err
 	}
 
-	return client.client.HExists(ctx, key, field).Result()
+	return c.client.HExists(ctx, key, field).Result()
 }
 
-func (client *singleClient) HScan(
+func (c *singleClient) HScan(
 	ctx context.Context,
 	key string,
 	cursor uint64,
@@ -317,18 +325,18 @@ func (client *singleClient) HScan(
 		return nil, 0, err
 	}
 
-	return client.client.HScan(ctx, key, cursor, pattern, count).Result()
+	return c.client.HScan(ctx, key, cursor, pattern, count).Result()
 }
 
-func (client *singleClient) HIncrBy(ctx context.Context, key, field string, incr int64) (int64, error) {
+func (c *singleClient) HIncrBy(ctx context.Context, key, field string, incr int64) (int64, error) {
 	if err := validate(ctx, key); err != nil {
 		return 0, err
 	}
 
-	return client.client.HIncrBy(ctx, key, field, incr).Result()
+	return c.client.HIncrBy(ctx, key, field, incr).Result()
 }
 
-func (client *singleClient) HIncrByFloat(
+func (c *singleClient) HIncrByFloat(
 	ctx context.Context,
 	key, field string,
 	incr float64,
@@ -337,34 +345,34 @@ func (client *singleClient) HIncrByFloat(
 		return 0, err
 	}
 
-	return client.client.HIncrByFloat(ctx, key, field, incr).Result()
+	return c.client.HIncrByFloat(ctx, key, field, incr).Result()
 }
 
-func (client *singleClient) HDelete(ctx context.Context, key string, fields ...string) error {
+func (c *singleClient) HDelete(ctx context.Context, key string, fields ...string) error {
 	if err := validate(ctx, key); err != nil {
 		return err
 	}
 
-	return client.client.HDel(ctx, key, fields...).Err()
+	return c.client.HDel(ctx, key, fields...).Err()
 }
 
-func (client *singleClient) HKeys(ctx context.Context, key string) ([]string, error) {
+func (c *singleClient) HKeys(ctx context.Context, key string) ([]string, error) {
 	if err := validate(ctx, key); err != nil {
 		return nil, err
 	}
 
-	return client.client.HKeys(ctx, key).Result()
+	return c.client.HKeys(ctx, key).Result()
 }
 
-func (client *singleClient) HLen(ctx context.Context, key string) (int64, error) {
+func (c *singleClient) HLen(ctx context.Context, key string) (int64, error) {
 	if err := validate(ctx, key); err != nil {
 		return 0, err
 	}
 
-	return client.client.HLen(ctx, key).Result()
+	return c.client.HLen(ctx, key).Result()
 }
 
-func (client *singleClient) HMGet(ctx context.Context, key string, fields ...string) ([]any, error) {
+func (c *singleClient) HMGet(ctx context.Context, key string, fields ...string) ([]any, error) {
 	if len(fields) == 0 {
 		return []any{}, nil
 	}
@@ -373,10 +381,10 @@ func (client *singleClient) HMGet(ctx context.Context, key string, fields ...str
 		return []any{}, err
 	}
 
-	return client.client.HMGet(ctx, key, fields...).Result()
+	return c.client.HMGet(ctx, key, fields...).Result()
 }
 
-func (client *singleClient) HMSet(ctx context.Context, key string, values ...any) error {
+func (c *singleClient) HMSet(ctx context.Context, key string, values ...any) error {
 	if len(values) == 0 {
 		return nil
 	}
@@ -385,18 +393,18 @@ func (client *singleClient) HMSet(ctx context.Context, key string, values ...any
 		return err
 	}
 
-	return client.client.HMSet(ctx, key, values...).Err()
+	return c.client.HMSet(ctx, key, values...).Err()
 }
 
-func (client *singleClient) HSetNX(ctx context.Context, key, field string, value any) error {
+func (c *singleClient) HSetNX(ctx context.Context, key, field string, value any) error {
 	if err := validate(ctx, key); err != nil {
 		return err
 	}
 
-	return client.client.HSetNX(ctx, key, field, value).Err()
+	return c.client.HSetNX(ctx, key, field, value).Err()
 }
 
-func (client *singleClient) Scan(
+func (c *singleClient) Scan(
 	ctx context.Context,
 	cursor uint64,
 	pattern string,
@@ -406,10 +414,10 @@ func (client *singleClient) Scan(
 		return nil, 0, err
 	}
 
-	return client.client.Scan(ctx, cursor, pattern, count).Result()
+	return c.client.Scan(ctx, cursor, pattern, count).Result()
 }
 
-func (client *singleClient) HScanNoValues(
+func (c *singleClient) HScanNoValues(
 	ctx context.Context,
 	key string,
 	cursor uint64,
@@ -420,26 +428,26 @@ func (client *singleClient) HScanNoValues(
 		return nil, 0, err
 	}
 
-	return client.client.HScanNoValues(ctx, key, cursor, pattern, count).Result()
+	return c.client.HScanNoValues(ctx, key, cursor, pattern, count).Result()
 }
 
-func (client *singleClient) HVals(ctx context.Context, key string) ([]string, error) {
+func (c *singleClient) HVals(ctx context.Context, key string) ([]string, error) {
 	if err := validate(ctx, key); err != nil {
 		return nil, err
 	}
 
-	return client.client.HVals(ctx, key).Result()
+	return c.client.HVals(ctx, key).Result()
 }
 
-func (client *singleClient) HRandField(ctx context.Context, key string, count int) ([]string, error) {
+func (c *singleClient) HRandField(ctx context.Context, key string, count int) ([]string, error) {
 	if err := validate(ctx, key); err != nil {
 		return nil, err
 	}
 
-	return client.client.HRandField(ctx, key, count).Result()
+	return c.client.HRandField(ctx, key, count).Result()
 }
 
-func (client *singleClient) HRandFieldWithValues(
+func (c *singleClient) HRandFieldWithValues(
 	ctx context.Context,
 	key string,
 	count int,
@@ -448,10 +456,10 @@ func (client *singleClient) HRandFieldWithValues(
 		return nil, err
 	}
 
-	return client.client.HRandFieldWithValues(ctx, key, count).Result()
+	return c.client.HRandFieldWithValues(ctx, key, count).Result()
 }
 
-func (client *singleClient) HExpire(
+func (c *singleClient) HExpire(
 	ctx context.Context,
 	key string,
 	expiration time.Duration,
@@ -465,10 +473,10 @@ func (client *singleClient) HExpire(
 		return nil, err
 	}
 
-	return client.client.HExpire(ctx, key, expiration, fields...).Result()
+	return c.client.HExpire(ctx, key, expiration, fields...).Result()
 }
 
-func (client *singleClient) HTTL(ctx context.Context, key string, fields ...string) ([]int64, error) {
+func (c *singleClient) HTTL(ctx context.Context, key string, fields ...string) ([]int64, error) {
 	if len(fields) == 0 {
 		return nil, nil
 	}
@@ -477,5 +485,13 @@ func (client *singleClient) HTTL(ctx context.Context, key string, fields ...stri
 		return nil, err
 	}
 
-	return client.client.HTTL(ctx, key, fields...).Result()
+	return c.client.HTTL(ctx, key, fields...).Result()
+}
+
+func (c *singleClient) Eval(ctx context.Context, script string, keys []string, args ...any) (any, error) {
+	if err := validateMultiple(ctx, keys); err != nil {
+		return nil, err
+	}
+
+	return c.client.Eval(ctx, script, keys, args...).Result()
 }
