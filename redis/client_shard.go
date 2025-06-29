@@ -690,6 +690,93 @@ func (c *shardClient) Eval(ctx context.Context, script string, keys []string, ar
 	return raw.Client().Eval(ctx, script, keys, args...).Result()
 }
 
+func (c *shardClient) EvalSha(ctx context.Context, sha1 string, keys []string, args ...any) (any, error) {
+	if len(keys) == 0 {
+		return nil, nil
+	}
+
+	if err := validateMultiple(ctx, keys); err != nil {
+		return nil, err
+	}
+
+	raw, err := c.clients.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return raw.Client().EvalSha(ctx, sha1, keys, args...).Result()
+}
+
+func (c *shardClient) EvalRO(ctx context.Context, script string, keys []string, args ...any) (any, error) {
+	if len(keys) == 0 {
+		return nil, nil
+	}
+
+	if err := validateMultiple(ctx, keys); err != nil {
+		return nil, err
+	}
+
+	raw, err := c.clients.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return raw.Client().EvalRO(ctx, script, keys, args...).Result()
+}
+
+func (c *shardClient) EvalShaRO(ctx context.Context, sha1 string, keys []string, args ...any) (any, error) {
+	if len(keys) == 0 {
+		return nil, nil
+	}
+
+	if err := validateMultiple(ctx, keys); err != nil {
+		return nil, err
+	}
+
+	raw, err := c.clients.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return raw.Client().EvalShaRO(ctx, sha1, keys, args...).Result()
+}
+
+func (c *shardClient) ScriptExists(ctx context.Context, hashes ...string) ([]bool, error) {
+	raw, err := c.clients.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return raw.Client().ScriptExists(ctx, hashes...).Result()
+}
+
+func (c *shardClient) ScriptFlush(ctx context.Context) (string, error) {
+	raw, err := c.clients.Get(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return raw.Client().ScriptFlush(ctx).Result()
+}
+
+func (c *shardClient) ScriptKill(ctx context.Context) (string, error) {
+	raw, err := c.clients.Get(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return raw.Client().ScriptKill(ctx).Result()
+}
+
+func (c *shardClient) ScriptLoad(ctx context.Context, script string) (string, error) {
+	raw, err := c.clients.Get(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return raw.Client().ScriptLoad(ctx, script).Result()
+}
+
 type ShardClient interface {
 	Key() string
 	Conditions() []string

@@ -495,3 +495,43 @@ func (c *singleClient) Eval(ctx context.Context, script string, keys []string, a
 
 	return c.client.Eval(ctx, script, keys, args...).Result()
 }
+
+func (c *singleClient) EvalSha(ctx context.Context, sha1 string, keys []string, args ...any) (any, error) {
+	if err := validateMultiple(ctx, keys); err != nil {
+		return nil, err
+	}
+
+	return c.client.EvalSha(ctx, sha1, keys, args...).Result()
+}
+
+func (c *singleClient) EvalRO(ctx context.Context, script string, keys []string, args ...any) (any, error) {
+	if err := validateMultiple(ctx, keys); err != nil {
+		return nil, err
+	}
+
+	return c.client.EvalRO(ctx, script, keys, args...).Result()
+}
+
+func (c *singleClient) EvalShaRO(ctx context.Context, sha1 string, keys []string, args ...any) (any, error) {
+	if err := validateMultiple(ctx, keys); err != nil {
+		return nil, err
+	}
+
+	return c.client.EvalShaRO(ctx, sha1, keys, args...).Result()
+}
+
+func (c *singleClient) ScriptExists(ctx context.Context, hashes ...string) ([]bool, error) {
+	return c.client.ScriptExists(ctx, hashes...).Result()
+}
+
+func (c *singleClient) ScriptFlush(ctx context.Context) (string, error) {
+	return c.client.ScriptFlush(ctx).Result()
+}
+
+func (c *singleClient) ScriptKill(ctx context.Context) (string, error) {
+	return c.client.ScriptKill(ctx).Result()
+}
+
+func (c *singleClient) ScriptLoad(ctx context.Context, script string) (string, error) {
+	return c.client.ScriptLoad(ctx, script).Result()
+}

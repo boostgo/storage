@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/boostgo/contextx"
-
 	"github.com/redis/go-redis/v9"
 )
 
@@ -58,6 +57,14 @@ type Client interface {
 	HTTL(ctx context.Context, key string, fields ...string) ([]int64, error)
 
 	Eval(ctx context.Context, script string, keys []string, args ...any) (any, error)
+	EvalSha(ctx context.Context, sha1 string, keys []string, args ...any) (any, error)
+	EvalRO(ctx context.Context, script string, keys []string, args ...any) (any, error)
+	EvalShaRO(ctx context.Context, sha1 string, keys []string, args ...any) (any, error)
+
+	ScriptExists(ctx context.Context, hashes ...string) ([]bool, error)
+	ScriptFlush(ctx context.Context) (string, error)
+	ScriptKill(ctx context.Context) (string, error)
+	ScriptLoad(ctx context.Context, script string) (string, error)
 }
 
 func validate(ctx context.Context, key string) error {
